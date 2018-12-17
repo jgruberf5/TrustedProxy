@@ -260,7 +260,7 @@ This extension extends the iControl REST URI namespace at:
 
 `/mgmt/shared/TrustedProxy`
 
-Placing `GET` requests to this iControl REST URI endpoint will either a list of tokens for all trusted devices, or a filtered list when a `targetHost` query parameter is supplied.
+Placing `GET` requests to this iControl REST URI endpoint will either a list of tokens for all trusted devices, or a filtered list when a `targetHost` path parameter is supplied.
 
 `GET /mgmt/shared/TrustedProxy`
 
@@ -273,7 +273,9 @@ Response
 }
 ```
 
-`GET /mgmt/shared/TrustedProxy?targetHost=172.13.1.107`
+Adding the trusted device `targetHost` to the path will filter the results.
+
+`GET /mgmt/shared/TrustedProxy/172.13.1.107`
 
 Response
 
