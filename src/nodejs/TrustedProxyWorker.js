@@ -159,7 +159,6 @@ class TrustedProxyWorker {
                 });
                 res.on('end', () => {
                     resolve(body);
-                    resolve(null);
                 });
                 res.on('error', (err) => {
                     this.logger.severe('error: ' + err);
