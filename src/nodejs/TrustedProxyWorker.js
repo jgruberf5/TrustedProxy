@@ -101,25 +101,67 @@ class TrustedProxyWorker {
      */
     getTrustedDevices() {
         return new Promise((resolve) => {
-            const getOptions = {
+            const getDeviceGroupsOptions = {
                 host: 'localhost',
                 port: 8100,
-                path: '/mgmt/shared/resolver/device-groups/dockerContainers/devices',
+                path: '/mgmt/shared/resolver/device-groups',
                 headers: {
                     'Authorization': localauth
                 },
                 method: 'GET'
             };
-            const request = http.request(getOptions, (res) => {
+            const deviceGroupRequest = http.request(getDeviceGroupsOptions, (res) => {
                 let body = '';
                 res.on('data', (seg) => {
                     body += seg;
                 });
                 res.on('end', () => {
                     if (res.statusCode < 400) {
-                        resolve(JSON.parse(body).items);
+                        const deviceGroups = JSON.parse(body).items;
+                        const trustedGroups = [];
+                        const trustedDevicePromises = [];
+                        const trustedDevices = [];
+                        deviceGroups.map((deviceGroup) => {
+                            if (deviceGroup.groupName.startsWith('TrustProxy')) {
+                                trustedGroups.push(deviceGroup.groupName);
+                            }
+                        });
+                        trustedGroups.map((groupName) => {
+                            const devicePromise = new Promise((resolve, reject) => {
+                                const getDevicesOptions = {
+                                    host: 'localhost',
+                                    port: 8100,
+                                    path: '/mgmt/shared/resolver/device-groups/' + groupName + '/devices',
+                                    headers: {
+                                        'Authorization': localauth
+                                    },
+                                    method: 'GET'
+                                };
+                                const deviceRequest = http.request(getDevicesOptions, (res) => {
+                                    let body = '';
+                                    res.on('data', (seg) => {
+                                        body += seg;
+                                    });
+                                    res.on('end', () => {
+                                        if (res.statusCode < 400) {
+                                            const devices = JSON.parse(body).items;
+                                            devices.map((device) => {
+                                                trustedDevices.push(device);
+                                            });
+                                        }
+                                        resolve();
+                                    });
+                                });
+                                deviceRequest.end();
+                            });
+                            trustedDevicePromises.push(devicePromise);
+                        });
+                        Promise.all(trustedDevicePromises)
+                            .then(() => {
+                                resolve(trustedDevices);
+                            });
                     } else {
-                        this.logger.severe('no trusted devices in dockerContainers device group');
+                        this.logger.severe('no device groups found');
                         resolve([]);
                     }
                 });
@@ -128,7 +170,7 @@ class TrustedProxyWorker {
                     resolve([]);
                 });
             });
-            request.end();
+            deviceGroupRequest.end();
         });
     }
 
