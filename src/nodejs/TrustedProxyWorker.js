@@ -23,17 +23,39 @@ class TrustedProxyWorker {
      */
     onGet(restOperation) {
         const paths = restOperation.uri.pathname.split('/');
-        if (paths.length > 3) {
-            const targetHost = paths[3];
-            this.getToken(targetHost)
-                .then((token) => {
-                    restOperation.statusCode = 200;
-                    restOperation.body = token;
-                    this.completeRestOperation(restOperation);
-                });
-        } else {
-            this.getTrustedDevices()
-                .then((trustedDevices) => {
+        this.getTrustedDevices()
+            .then((trustedDevices) => {
+                let targetHost = null;
+                if (paths.length > 3) {
+                    targetHost = paths[3];
+                } else {
+                    const query = restOperation.getUri().query;
+                    targetHost = query.targetHost;
+                }
+                if (targetHost) {
+                    const tokenPromises = [];
+                    let targetHostFound = false;
+                    trustedDevices.map((trustedDevice) => {
+                        if (trustedDevice.address == targetHost) {
+                            targetHostFound = true;
+                            const tokenPromise = this.getToken(targetHost)
+                                .then((token) => {
+                                    restOperation.statusCode = 200;
+                                    restOperation.body = token;
+                                    this.completeRestOperation(restOperation);
+                                });
+                            tokenPromise.push(tokenPromise);
+                        }
+                    });
+                    Promise.all(tokenPromises)
+                        .then(() => {
+                            if (!targetHostFound) {
+                                const err = new Error('targetHost ' + targetHost + ' is not a trusted device');
+                                err.httpStatusCode = 404;
+                                restOperation.fail(err);
+                            }
+                        });
+                } else {
                     const tokens = {};
                     const tokenPromises = [];
                     trustedDevices.map((trustedDevice) => {
@@ -49,8 +71,8 @@ class TrustedProxyWorker {
                             restOperation.body = JSON.stringify(tokens);
                             this.completeRestOperation(restOperation);
                         });
-                });
-        }
+                }
+            });
     }
 
     /**
