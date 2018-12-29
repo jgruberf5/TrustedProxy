@@ -1,7 +1,7 @@
 Summary: TrustedProxy for the Application Services Gateway
 Name: TrustedProxy
-Version: 1.0.0
-Release: 0002
+Version: 1.0.1
+Release: 0000
 BuildArch: noarch
 Group: Development/Libraries
 License: Apache-2.0
