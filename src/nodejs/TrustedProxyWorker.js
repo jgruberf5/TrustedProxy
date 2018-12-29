@@ -15,6 +15,36 @@ class TrustedProxyWorker {
         this.WORKER_URI_PATH = "shared/TrustedProxy";
         this.isPassThrough = true;
         this.isPublic = true;
+        this.trustedDevices = {};
+        this.machineId = null;
+    }
+
+    onStart(success, error) {
+        const getDeviceOptions = {
+            host: 'localhost',
+            port: 8100,
+            path: '/mgmt/shared/identified-devices/config/device-info',
+            headers: {
+                'Authorization': localauth
+            },
+            method: 'GET'
+        };
+        const deviceRequest = http.request(getDeviceOptions, (res) => {
+            let body = '';
+            res.on('data', (seg) => {
+                body += seg;
+            });
+            res.on('end', () => {
+                this.machineId = JSON.parse(body).machineId;
+                this.logger.info('TrustedProxy machineID is: ' + this.machineId);
+                success();
+            });
+            res.on('error', (err) => {
+                this.logger.severe('error: ' + err);
+                error();
+            });
+        });
+        deviceRequest.end();
     }
 
     /**
@@ -23,56 +53,99 @@ class TrustedProxyWorker {
      */
     onGet(restOperation) {
         const paths = restOperation.uri.pathname.split('/');
-        this.getTrustedDevices()
-            .then((trustedDevices) => {
-                let targetHost = null;
-                if (paths.length > 3) {
-                    targetHost = paths[3];
-                } else {
-                    const query = restOperation.getUri().query;
-                    targetHost = query.targetHost;
-                }
-                if (targetHost) {
-                    const tokenPromises = [];
-                    let targetHostFound = false;
-                    trustedDevices.map((trustedDevice) => {
-                        if (trustedDevice.address == targetHost) {
-                            targetHostFound = true;
-                            const tokenPromise = this.getToken(targetHost)
-                                .then((token) => {
-                                    restOperation.statusCode = 200;
-                                    restOperation.body = token;
-                                    this.completeRestOperation(restOperation);
-                                });
-                            tokenPromise.push(tokenPromise);
-                        }
-                    });
-                    Promise.all(tokenPromises)
-                        .then(() => {
-                            if (!targetHostFound) {
-                                const err = new Error('targetHost ' + targetHost + ' is not a trusted device');
-                                err.httpStatusCode = 404;
-                                restOperation.fail(err);
+        const query = restOperation.getUri().query;
+        const targetHost = query.targetHost;
+        const targetUUID = query.targetUUID;
+        let targetDevice = null;
+
+        if (targetHost) {
+            targetDevice = targetHost;
+        } else if (targetUUID) {
+            targetDevice = targetUUID;
+        } else if (paths.length > 3) {
+            targetDevice = paths[3];
+        }
+
+        if (this.trustedDevices[targetDevice]) {
+            this.getToken(this.trustedDevices[targetDevice].address)
+                .then((token) => {
+                    if (token) {
+                        token.targetUUID = this.trustedDevices[targetDevice].machineId;
+                        token.targetHost = this.trustedDevices[targetDevice].address;
+                        token.targetPort = this.trustedDevices[targetDevice].httpsPort;
+                        delete token.address;
+                        restOperation.statusCode = 200;
+                        restOperation.body = token;
+                        this.completeRestOperation(restOperation);
+                    } else {
+                        const err = new Error('target ' + targetDevice + ' has no token');
+                        err.httpStatusCode = 500;
+                        restOperation.fail(err);
+                    }
+                });
+        } else {
+            this.getTrustedDevices()
+                .then((trustedDevices) => {
+                    if (targetDevice) {
+                        const tokenPromises = [];
+                        let targetHostFound = false;
+                        trustedDevices.map((trustedDevice) => {
+                            if (trustedDevice.address == targetDevice || trustedDevice.machineId == targetDevice) {
+                                targetHostFound = true;
+                                const tokenPromise = this.getToken(trustedDevice.address)
+                                    .then((token) => {
+                                        if (token) {
+                                            token.targetUUID = trustedDevice.machineId;
+                                            token.targetHost = trustedDevice.address;
+                                            token.targetPort = trustedDevice.httpsPort;
+                                            delete token.address;
+                                            restOperation.statusCode = 200;
+                                            restOperation.body = token;
+                                            this.completeRestOperation(restOperation);
+                                        } else {
+                                            const err = new Error('target ' + targetDevice + ' has no token');
+                                            this.trustedDevices = {};
+                                            err.httpStatusCode = 500;
+                                            restOperation.fail(err);
+                                        }
+                                    });
+                                tokenPromise.push(tokenPromise);
                             }
                         });
-                } else {
-                    const tokens = {};
-                    const tokenPromises = [];
-                    trustedDevices.map((trustedDevice) => {
-                        const tokenPromise = this.getToken(trustedDevice.address)
-                            .then((token) => {
-                                tokens[trustedDevice.address] = token;
+                        Promise.all(tokenPromises)
+                            .then(() => {
+                                if (!targetHostFound) {
+                                    const err = new Error('target ' + targetDevice + ' is not a trusted device');
+                                    this.trustedDevices = {};
+                                    err.httpStatusCode = 404;
+                                    restOperation.fail(err);
+                                }
                             });
-                        tokenPromises.push(tokenPromise);
-                    });
-                    Promise.all(tokenPromises)
-                        .then(() => {
-                            restOperation.statusCode = 200;
-                            restOperation.body = JSON.stringify(tokens);
-                            this.completeRestOperation(restOperation);
+                    } else {
+                        const tokens = {};
+                        const tokenPromises = [];
+                        trustedDevices.map((trustedDevice) => {
+                            const tokenPromise = this.getToken(trustedDevice.address)
+                                .then((token) => {
+                                    if (token) {
+                                        token.targetUUID = trustedDevice.machineId;
+                                        token.targetHost = trustedDevice.address;
+                                        token.targetPort = trustedDevice.httpsPort;
+                                        delete token.address;
+                                        tokens[trustedDevice.machineId] = token;
+                                    }
+                                });
+                            tokenPromises.push(tokenPromise);
                         });
-                }
-            });
+                        Promise.all(tokenPromises)
+                            .then(() => {
+                                restOperation.statusCode = 200;
+                                restOperation.body = JSON.stringify(Object.keys(tokens).map(e => tokens[e]));
+                                this.completeRestOperation(restOperation);
+                            });
+                    }
+                });
+        }
     }
 
     /**
@@ -82,47 +155,115 @@ class TrustedProxyWorker {
     onPost(restOperation) {
         const body = restOperation.getBody();
         const refThis = this;
-        // Create the framework request RestOperation to proxy to a trusted device.
-        let identifiedDeviceRequest = this.restOperationFactory.createRestOperationInstance()
-            // Tell the ASG to resolve trusted device for this request.
-            .setIdentifiedDeviceRequest(true)
-            .setIdentifiedDeviceGroupName(body.groupName)
-            // Discern the type of request to proxy from the 'method' attributes in the request body.
-            .setMethod(body.method || "Get")
-            // Discern the URI for the request to proxy from the 'uri' attribute in the request body. 
-            .setUri(this.url.parse(body.uri))
-            // Discern the HTTP headers for the request to proxy from the 'headers' attribute in the request body.
-            .setHeaders(body.headers || restOperation.getHeaders())
-            // Discern the HTTP body for the request to proxy from the 'body' attribute in the request body.
-            .setBody(body.body)
-            // Derive the referer from the parsed URI.
-            .setReferer(this.getUri().href);
-
-        this.eventChannel.emit(this.eventChannel.e.sendRestOperation, identifiedDeviceRequest,
-            function (resp) {
-                // Return the HTTP status code from the proxied response.
-                restOperation.statusCode = resp.statusCode;
-                // Return the HTTP headers from the proxied response.
-                restOperation.headers = resp.headers;
-                // Return the body from the proxied response.
-                restOperation.body = resp.body;
-                // emmit event to complete this response through the REST framework.
-                refThis.completeRestOperation(restOperation);
-            },
-            function (err) {
-                // The proxied response was an error. Forward the error through the REST framework.
-                refThis.logger.severe("Request to %s failed: \n%s", body.uri, err ? err.message : "");
-                restOperation.fail(err);
-            }
-        );
+        const paths = restOperation.uri.pathname.split('/');
+        if (paths.length > 3) {
+            const targetUUID = paths[3];
+            // get the targetHost for this UUID
+            this.getTargetHostByUUID(targetUUID)
+                .then((targetHost) => {
+                    if (targetHost) {
+                        const targetURI = 'https://' + targetHost + body.uri;
+                        // Create the framework request RestOperation to proxy to a trusted device.
+                        let identifiedDeviceRequest = this.restOperationFactory.createRestOperationInstance()
+                            // Tell the ASG to resolve trusted device for this request.
+                            .setIdentifiedDeviceRequest(true)
+                            .setIdentifiedDeviceGroupName(body.groupName)
+                            // Discern the type of request to proxy from the 'method' attributes in the request body.
+                            .setMethod(body.method || "Get")
+                            // Discern the URI for the request to proxy from the 'uri' attribute in the request body. 
+                            .setUri(this.url.parse(targetURI))
+                            // Discern the HTTP headers for the request to proxy from the 'headers' attribute in the request body.
+                            .setHeaders(body.headers || restOperation.getHeaders())
+                            // Discern the HTTP body for the request to proxy from the 'body' attribute in the request body.
+                            .setBody(body.body)
+                            // Derive the referer from the parsed URI.
+                            .setReferer(this.getUri().href);
+                        this.eventChannel.emit(this.eventChannel.e.sendRestOperation, identifiedDeviceRequest,
+                            function (resp) {
+                                // Return the HTTP status code from the proxied response.
+                                restOperation.statusCode = resp.statusCode;
+                                // Return the HTTP headers from the proxied response.
+                                restOperation.headers = resp.headers;
+                                // Return the body from the proxied response.
+                                restOperation.body = resp.body;
+                                // emmit event to complete this response through the REST framework.
+                                refThis.completeRestOperation(restOperation);
+                            },
+                            function (err) {
+                                // The proxied response was an error. Forward the error through the REST framework.
+                                refThis.logger.severe("Request to %s failed: \n%s", body.uri, err ? err.message : "");
+                                restOperation.fail(err);
+                            }
+                        );
+                    } else {
+                        const err = new Error('target ' + targetUUID + ' is not a trusted device');
+                        err.httpStatusCode = 404;
+                        restOperation.fail(err);
+                    }
+                });
+        } else {
+            // Create the framework request RestOperation to proxy to a trusted device.
+            let identifiedDeviceRequest = this.restOperationFactory.createRestOperationInstance()
+                // Tell the ASG to resolve trusted device for this request.
+                .setIdentifiedDeviceRequest(true)
+                .setIdentifiedDeviceGroupName(body.groupName)
+                // Discern the type of request to proxy from the 'method' attributes in the request body.
+                .setMethod(body.method || "Get")
+                // Discern the URI for the request to proxy from the 'uri' attribute in the request body. 
+                .setUri(this.url.parse(body.uri))
+                // Discern the HTTP headers for the request to proxy from the 'headers' attribute in the request body.
+                .setHeaders(body.headers || restOperation.getHeaders())
+                // Discern the HTTP body for the request to proxy from the 'body' attribute in the request body.
+                .setBody(body.body)
+                // Derive the referer from the parsed URI.
+                .setReferer(this.getUri().href);
+            this.eventChannel.emit(this.eventChannel.e.sendRestOperation, identifiedDeviceRequest,
+                function (resp) {
+                    // Return the HTTP status code from the proxied response.
+                    restOperation.statusCode = resp.statusCode;
+                    // Return the HTTP headers from the proxied response.
+                    restOperation.headers = resp.headers;
+                    // Return the body from the proxied response.
+                    restOperation.body = resp.body;
+                    // emmit event to complete this response through the REST framework.
+                    refThis.completeRestOperation(restOperation);
+                },
+                function (err) {
+                    // The proxied response was an error. Forward the error through the REST framework.
+                    refThis.logger.severe("Request to %s failed: \n%s", body.uri, err ? err.message : "");
+                    restOperation.fail(err);
+                }
+            );
+        }
     }
 
     /**
-     * handle trusted devices request - all trusted devices.
-     * @param {Array} trusted devices
+     * Lookup targetHost by targetUUID.
+     * @param targetUUID
+     */
+    getTargetHostByUUID(targetUUID) {
+        return new Promise((resolve) => {
+            if (this.trustedDevices[targetUUID]) {
+                resolve(this.trustedDevices[targetUUID].address + ":" + this.trustedDevices[targetUUID].httpsPort);
+            } else {
+                this.getTrustedDevices()
+                    .then(() => {
+                        if (this.trustedDevices[targetUUID]) {
+                            resolve(this.trustedDevices[targetUUID].address + ":" + this.trustedDevices[targetUUID].httpsPort);
+                        } else {
+                            resolve(null);
+                        }
+                    });
+            }
+        });
+    }
+
+    /**
+     * collect all trusted devices.
      */
     getTrustedDevices() {
         return new Promise((resolve) => {
+            this.trustedDevices = {};
             const getDeviceGroupsOptions = {
                 host: 'localhost',
                 port: 8100,
@@ -168,7 +309,11 @@ class TrustedProxyWorker {
                                         if (res.statusCode < 400) {
                                             const devices = JSON.parse(body).items;
                                             devices.map((device) => {
-                                                trustedDevices.push(device);
+                                                if (this.machineId != device.machineId) {
+                                                    // populate trustedDevices cache
+                                                    this.trustedDevices[device.machineId] = device;
+                                                    trustedDevices.push(device);
+                                                }
                                             });
                                         }
                                         resolve();
@@ -222,7 +367,7 @@ class TrustedProxyWorker {
                     body += seg;
                 });
                 res.on('end', () => {
-                    resolve(body);
+                    resolve(JSON.parse(body));
                 });
                 res.on('error', (err) => {
                     this.logger.severe('error: ' + err);

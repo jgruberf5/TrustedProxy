@@ -250,6 +250,143 @@ Response
 }
 ```
 
+Alternatively, if you wish to completely separate the TMOS concern of resolving the `targetHost` and `targetPort`, you can specify the `targetUUID` on the request path and removing the protocol, host, and port parts of the request URI.
+
+The supplied path `targetUUID` will be resolved to the proper `targetHost` and `targetPort` and then request URI constructed with those resolved values.
+
+In the example below, the trusted device has a `targetUUID` of `7390b3b8-7682-4554-83e5-764e4f26703c` which will resolve the the `targetHost` of `172.13.1.07` and a `targetPort` of `443`.
+
+To make the same AS3 declaration as above, add the `targetUUID` to the request path and then remove the protocol, host, and port components of the `uri` attribute in the body. This makes your `POST` body `uri` simply `/mgmt/shared/appsvcs/declare`.
+
+***Hint: the targetUUID is the machineId of the trustedHost***
+
+`POST /mgmt/shared/TrustedProxy/7390b3b8-7682-4554-83e5-764e4f26703c`
+
+Body
+
+```
+{
+	"method": "Post",
+	"uri": "/mgmt/shared/appsvcs/declare",
+	"body": {
+		"class": "AS3",
+		"action": "deploy",
+		"persist": true,
+		"declaration": {
+			"class": "ADC",
+			"schemaVersion": "3.0.0",
+			"id": "fghijkl7890",
+			"label": "Sample 1",
+			"remark": "HTTP with custom persistence",
+			"Sample_http_01": {
+				"class": "Tenant",
+				"A1": {
+					"class": "Application",
+					"template": "http",
+					"serviceMain": {
+						"class": "Service_HTTP",
+						"virtualAddresses": [
+							"10.0.6.10"
+						],
+						"pool": "web_pool",
+						"persistenceMethods": [{
+							"use": "jsessionid"
+						}]
+					},
+					"web_pool": {
+						"class": "Pool",
+						"monitors": [
+							"http"
+						],
+						"members": [{
+							"servicePort": 80,
+							"serverAddresses": [
+								"192.0.6.10",
+								"192.0.6.11"
+							]
+						}]
+					},
+					"jsessionid": {
+						"class": "Persist",
+						"persistenceMethod": "cookie",
+						"cookieMethod": "hash",
+						"cookieName": "JSESSIONID"
+					}
+				}
+			}
+		}
+	}
+}
+```
+
+Response
+
+```
+{
+    "results": [
+        {
+            "message": "success",
+            "lineCount": 25,
+            "code": 200,
+            "host": "localhost",
+            "tenant": "Sample_http_01",
+            "runTime": 2368
+        }
+    ],
+    "declaration": {
+        "class": "ADC",
+        "schemaVersion": "3.0.0",
+        "id": "fghijkl7890",
+        "label": "Sample 1",
+        "remark": "HTTP with custom persistence",
+        "Sample_http_01": {
+            "class": "Tenant",
+            "A1": {
+                "class": "Application",
+                "template": "http",
+                "serviceMain": {
+                    "class": "Service_HTTP",
+                    "virtualAddresses": [
+                        "10.0.6.10"
+                    ],
+                    "pool": "web_pool",
+                    "persistenceMethods": [
+                        {
+                            "use": "jsessionid"
+                        }
+                    ]
+                },
+                "web_pool": {
+                    "class": "Pool",
+                    "monitors": [
+                        "http"
+                    ],
+                    "members": [
+                        {
+                            "servicePort": 80,
+                            "serverAddresses": [
+                                "192.0.6.10",
+                                "192.0.6.11"
+                            ]
+                        }
+                    ]
+                },
+                "jsessionid": {
+                    "class": "Persist",
+                    "persistenceMethod": "cookie",
+                    "cookieMethod": "hash",
+                    "cookieName": "JSESSIONID"
+                }
+            }
+        },
+        "updateMode": "selective",
+        "controls": {
+            "archiveTimestamp": "2018-12-17T18:02:34.273Z"
+        }
+    }
+}
+```
+
 ## Query Parameter Token Signing ##
 
 As an alternative to proxying the requests through an iControlLX extension, orchestration applications can directly access trusted devices through the use of query parameter tokens.
@@ -267,10 +404,22 @@ Placing `GET` requests to this iControl REST URI endpoint will either a list of 
 Response
 
 ```
-{
-    "172.13.1.107": "{\"address\":\"172.13.1.107\",\"queryParam\":\"em_server_ip=1.1.1.104&em_server_auth_token=Lm7Pb7LerVQ6F9sIq0Mh0m%2FREdfXZE8oaApcXPTbDIQbYO8WT4D0yf2%2Bun58vON0aGMZDvM1YwN%2Fe%2FJrSBkpRJc79ZlVsZCRQgYgNnut6Xc5f1fj3ppnN0ABw6r%2BzDEnEzwdX5tTdRNAB1uCS4GnkZzSJm%2BJ9hy5qIx5WddYjLo247w6qR1L6FYWJk0mN%2F9qcnQg1e2KL1MMUMs8b6EMkKlEiMFLzw3SLRKEbb%2BSBk9g2iMPj99d%2FHH6K%2FCeP%2FgxkAmFq8DUYWseShQ3caJd7dlAkWQXOnsXV8awH6Rcr2s6LEJR9Lwu%2BHmmxuvFrqipfKue5DR46FHLMCxqaBqc2Q%3D%3D\",\"timestamp\":1545070309925}",
-    "1.1.1.104": "{\"address\":\"1.1.1.104\",\"queryParam\":\"em_server_ip=1.1.1.104&em_server_auth_token=Lm7Pb7LerVQ6F9sIq0Mh0m%2FREdfXZE8oaApcXPTbDIQbYO8WT4D0yf2%2Bun58vON0aGMZDvM1YwN%2Fe%2FJrSBkpRJc79ZlVsZCRQgYgNnut6Xc5f1fj3ppnN0ABw6r%2BzDEnEzwdX5tTdRNAB1uCS4GnkZzSJm%2BJ9hy5qIx5WddYjLo247w6qR1L6FYWJk0mN%2F9qcnQg1e2KL1MMUMs8b6EMkKlEiMFLzw3SLRKEbb%2BSBk9g2iMPj99d%2FHH6K%2FCeP%2FgxkAmFq8DUYWseShQ3caJd7dlAkWQXOnsXV8awH6Rcr2s6LEJR9Lwu%2BHmmxuvFrqipfKue5DR46FHLMCxqaBqc2Q%3D%3D\",\"timestamp\":1545070309968}"
-}
+[
+    {
+        "queryParam": "em_server_ip=1.1.1.104&em_server_auth_token=32W8%2FNw2mGHRDiqIbLbVblMy3L%2FT4oMI1LvEKQK4T8s8c9qYntQjZ47peLgT4H0l6ShubKNf1ubRkzV%2F3r9yCJAp68FlCtH0HSKT%2FwukWCSvWSUU1oEdSx0gRgUUUOkDjVDer1%2BOit8MRE8L4Nh5ZoUsPfNxgEBSoFdg0VvJ5ycEJhjKd0YXfD0R%2B6Qk%2FhPHpYmXyHdwC0bRvl0%2FlBn2QvQkvyRZGLiL3r0cOemLRKFsCcLTSpQlUUM%2BhcbXuwI%2B9%2FVMv5XUnY3%2FpxfUIS7O8k%2FWDVGm2r%2FKyWI2lNlHqHbkN5owk5FW7AXBArDI0OOLvvqEfg94DkCpZF2RLwS7xQ%3D%3D",
+        "timestamp": 1546102061136,
+        "targetUUID": "7390b3b8-7682-4554-83e5-764e4f26703c",
+        "targetHost": "172.13.1.107",
+        "targetPort": 443
+    },
+    {
+        "queryParam": "em_server_ip=1.1.1.104&em_server_auth_token=32W8%2FNw2mGHRDiqIbLbVblMy3L%2FT4oMI1LvEKQK4T8s8c9qYntQjZ47peLgT4H0l6ShubKNf1ubRkzV%2F3r9yCJAp68FlCtH0HSKT%2FwukWCSvWSUU1oEdSx0gRgUUUOkDjVDer1%2BOit8MRE8L4Nh5ZoUsPfNxgEBSoFdg0VvJ5ycEJhjKd0YXfD0R%2B6Qk%2FhPHpYmXyHdwC0bRvl0%2FlBn2QvQkvyRZGLiL3r0cOemLRKFsCcLTSpQlUUM%2BhcbXuwI%2B9%2FVMv5XUnY3%2FpxfUIS7O8k%2FWDVGm2r%2FKyWI2lNlHqHbkN5owk5FW7AAAAAAAA765vvqEfg94DkCpZF2RLwS7xQ%3D%3D",
+        "timestamp": 1546102061136,
+        "targetUUID": "e634cbdc-8690-4f03-acdc-219197788fc1",
+        "targetHost": "172.13.1.108",
+        "targetPort": 443
+    }
+]
 ```
 
 Adding the trusted device `targetHost` to the path will filter the results.
@@ -280,26 +429,72 @@ Adding the trusted device `targetHost` to the path will filter the results.
 Response
 
 ```
-{
-    "172.13.1.107": "{\"address\":\"172.13.1.107\",\"queryParam\":\"em_server_ip=1.1.1.104&em_server_auth_token=VOtAcdlDL1bmXwPpNh%2F2c6Hp39dpy7wXLFIgLEpdtidJtgR%2FqrVnLQ2p3YlfY7RY%2BxadmcDCdrpTx7krkBtsvuGfCt%2BlfgpB%2FiP%2BqDOZ0SpiE6fhjC7RnYcW2%2FhCagaOw%2FnOSIqi%2BbqPXI77m4gPcYz0Mn%2BS9vd0Nc%2Fi4kFjpdH40SFI1CLX2GtkDDL8AEKUZvIvisRdQIDfo1NOi5jbH8N0BjxV1q%2FEHCz6Gn0w9vQnsl6oZRiAKSSL7GJ1arbfvvul4rlDGxH6CVXDR5aWbx2hXgdKDQ7oOzn5XpRnbTH7Cw3hhYfBSdWGg5DSn1wdbsfISQXMxPZ%2FiSh8XXPgZQ%3D%3D\",\"timestamp\":1545070378115}"
-}
+[
+    {
+        "queryParam": "em_server_ip=1.1.1.104&em_server_auth_token=32W8%2FNw2mGHRDiqIbLbVblMy3L%2FT4oMI1LvEKQK4T8s8c9qYntQjZ47peLgT4H0l6ShubKNf1ubRkzV%2F3r9yCJAp68FlCtH0HSKT%2FwukWCSvWSUU1oEdSx0gRgUUUOkDjVDer1%2BOit8MRE8L4Nh5ZoUsPfNxgEBSoFdg0VvJ5ycEJhjKd0YXfD0R%2B6Qk%2FhPHpYmXyHdwC0bRvl0%2FlBn2QvQkvyRZGLiL3r0cOemLRKFsCcLTSpQlUUM%2BhcbXuwI%2B9%2FVMv5XUnY3%2FpxfUIS7O8k%2FWDVGm2r%2FKyWI2lNlHqHbkN5owk5FW7AXBArDI0OOLvvqEfg94DkCpZF2RLwS7xQ%3D%3D",
+        "timestamp": 1546102061136,
+        "targetUUID": "7390b3b8-7682-4554-83e5-764e4f26703c",
+        "targetHost": "172.13.1.107",
+        "targetPort": 443
+    }
+]
+```
+Alternatively you can add the `targetHost` as a query parameter as follows:
+
+`GET /mgmt/shared/TrustedProxy?targetHost=172.13.1.107`
+
+Response
+
+```
+[
+    {
+        "queryParam": "em_server_ip=1.1.1.104&em_server_auth_token=32W8%2FNw2mGHRDiqIbLbVblMy3L%2FT4oMI1LvEKQK4T8s8c9qYntQjZ47peLgT4H0l6ShubKNf1ubRkzV%2F3r9yCJAp68FlCtH0HSKT%2FwukWCSvWSUU1oEdSx0gRgUUUOkDjVDer1%2BOit8MRE8L4Nh5ZoUsPfNxgEBSoFdg0VvJ5ycEJhjKd0YXfD0R%2B6Qk%2FhPHpYmXyHdwC0bRvl0%2FlBn2QvQkvyRZGLiL3r0cOemLRKFsCcLTSpQlUUM%2BhcbXuwI%2B9%2FVMv5XUnY3%2FpxfUIS7O8k%2FWDVGm2r%2FKyWI2lNlHqHbkN5owk5FW7AXBArDI0OOLvvqEfg94DkCpZF2RLwS7xQ%3D%3D",
+        "timestamp": 1546102061136,
+        "targetUUID": "7390b3b8-7682-4554-83e5-764e4f26703c",
+        "targetHost": "172.13.1.107",
+        "targetPort": 443
+    }
+]
 ```
 
-The response takes the form of:
+To keep the behavior consistent with the `POST` behavior, supplying `targetUUID` is also supported.
+
+`GET /mgmt/shared/TrustedProxy/7390b3b8-7682-4554-83e5-764e4f26703c`
+
+Response
 
 ```
-{
-    "[trusted_device]" : "{\"address\":\"[trusted_device]\",
-                           \"queryParam\":\"[query_parameter_toke]\"
-                           \"timestamp\":\"[unix_timestamp]\"}"
-}
+[
+    {
+        "queryParam": "em_server_ip=1.1.1.104&em_server_auth_token=32W8%2FNw2mGHRDiqIbLbVblMy3L%2FT4oMI1LvEKQK4T8s8c9qYntQjZ47peLgT4H0l6ShubKNf1ubRkzV%2F3r9yCJAp68FlCtH0HSKT%2FwukWCSvWSUU1oEdSx0gRgUUUOkDjVDer1%2BOit8MRE8L4Nh5ZoUsPfNxgEBSoFdg0VvJ5ycEJhjKd0YXfD0R%2B6Qk%2FhPHpYmXyHdwC0bRvl0%2FlBn2QvQkvyRZGLiL3r0cOemLRKFsCcLTSpQlUUM%2BhcbXuwI%2B9%2FVMv5XUnY3%2FpxfUIS7O8k%2FWDVGm2r%2FKyWI2lNlHqHbkN5owk5FW7AXBArDI0OOLvvqEfg94DkCpZF2RLwS7xQ%3D%3D",
+        "timestamp": 1546102061136,
+        "targetUUID": "7390b3b8-7682-4554-83e5-764e4f26703c",
+        "targetHost": "172.13.1.107",
+        "targetPort": 443
+    }
+]
 ```
 
-The value can be parsed as a JSON object. The resulting `queryParam` attribute can be appending to a direct iControl REST request instead of using credentials or including an `X-F5-Auth-Token` header. The `timestamp` parameter indicates the Unix epoch timestamp when the token was issued. The token is good for 10 minutes (600 seconds). 
+`GET /mgmt/shared/TrustedProxy?targetUUID=7390b3b8-7682-4554-83e5-764e4f26703c`
+
+Response
+
+```
+[
+    {
+        "queryParam": "em_server_ip=1.1.1.104&em_server_auth_token=32W8%2FNw2mGHRDiqIbLbVblMy3L%2FT4oMI1LvEKQK4T8s8c9qYntQjZ47peLgT4H0l6ShubKNf1ubRkzV%2F3r9yCJAp68FlCtH0HSKT%2FwukWCSvWSUU1oEdSx0gRgUUUOkDjVDer1%2BOit8MRE8L4Nh5ZoUsPfNxgEBSoFdg0VvJ5ycEJhjKd0YXfD0R%2B6Qk%2FhPHpYmXyHdwC0bRvl0%2FlBn2QvQkvyRZGLiL3r0cOemLRKFsCcLTSpQlUUM%2BhcbXuwI%2B9%2FVMv5XUnY3%2FpxfUIS7O8k%2FWDVGm2r%2FKyWI2lNlHqHbkN5owk5FW7AXBArDI0OOLvvqEfg94DkCpZF2RLwS7xQ%3D%3D",
+        "timestamp": 1546102061136,
+        "targetUUID": "7390b3b8-7682-4554-83e5-764e4f26703c",
+        "targetHost": "172.13.1.107",
+        "targetPort": 443
+    }
+]
+```
+
+The resulting `queryParam` attribute can be appending to a direct iControl REST request instead of using credentials or including an `X-F5-Auth-Token` header. The `timestamp` parameter indicates the Unix epoch timestamp when the token was issued. The token is good for 10 minutes (600 seconds). 
 
 Attempts to use a token beyond its lifetime will yield `401 Unauthorized` response. New tokens can be issued at any time.
 
 As an example of using the above issued query parameter signing token, we could get the device information by directly querying trusted host `172.13.1.107` as follows:
 
 `GET /mgmt/shared/identified-devices/config/device-info?em_server_ip=1.1.1.104&em_server_auth_token=VOtAcdlDL1bmXwPpNh%2F2c6Hp39dpy7wXLFIgLEpdtidJtgR%2FqrVnLQ2p3YlfY7RY%2BxadmcDCdrpTx7krkBtsvuGfCt%2BlfgpB%2FiP%2BqDOZ0SpiE6fhjC7RnYcW2%2FhCagaOw%2FnOSIqi%2BbqPXI77m4gPcYz0Mn%2BS9vd0Nc%2Fi4kFjpdH40SFI1CLX2GtkDDL8AEKUZvIvisRdQIDfo1NOi5jbH8N0BjxV1q%2FEHCz6Gn0w9vQnsl6oZRiAKSSL7GJ1arbfvvul4rlDGxH6CVXDR5aWbx2hXgdKDQ7oOzn5XpRnbTH7Cw3hhYfBSdWGg5DSn1wdbsfISQXMxPZ%2FiSh8XXPgZQ%3D%3D`
-
