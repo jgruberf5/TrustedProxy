@@ -5,6 +5,8 @@
 const http = require('http');
 const localauth = 'Basic ' + new Buffer('admin:').toString('base64');
 
+const LOGGINGPREFIX = '[TrustedProxy] ';
+
 /**
  * Trusted Device Proxy which handles only POST requests
  * @constructor
@@ -36,11 +38,11 @@ class TrustedProxyWorker {
             });
             res.on('end', () => {
                 this.machineId = JSON.parse(body).machineId;
-                this.logger.info('TrustedProxy machineID is: ' + this.machineId);
+                this.logger.info(LOGGINGPREFIX + ' machineID is: ' + this.machineId);
                 success();
             });
             res.on('error', (err) => {
-                this.logger.severe('error: ' + err);
+                this.logger.severe(LOGGINGPREFIX + 'error: ' + err);
                 error();
             });
         });
@@ -191,12 +193,12 @@ class TrustedProxyWorker {
                             },
                             function (err) {
                                 // The proxied response was an error. Forward the error through the REST framework.
-                                refThis.logger.severe("Request to %s failed: \n%s", body.uri, err ? err.message : "");
+                                refThis.logger.severe(LOGGINGPREFIX + "request to %s failed: \n%s", body.uri, err ? err.message : "");
                                 restOperation.fail(err);
                             }
                         );
                     } else {
-                        const err = new Error('target ' + targetUUID + ' is not a trusted device');
+                        const err = new Error(LOGGINGPREFIX + 'target ' + targetUUID + ' is not a trusted device');
                         err.httpStatusCode = 404;
                         restOperation.fail(err);
                     }
@@ -230,7 +232,7 @@ class TrustedProxyWorker {
                 },
                 function (err) {
                     // The proxied response was an error. Forward the error through the REST framework.
-                    refThis.logger.severe("Request to %s failed: \n%s", body.uri, err ? err.message : "");
+                    refThis.logger.severe(LOGGINGPREFIX + "request to %s failed: \n%s", body.uri, err ? err.message : "");
                     restOperation.fail(err);
                 }
             );
@@ -328,12 +330,12 @@ class TrustedProxyWorker {
                                 resolve(trustedDevices);
                             });
                     } else {
-                        this.logger.severe('no device groups found');
+                        this.logger.severe(LOGGINGPREFIX + 'no device groups found');
                         resolve([]);
                     }
                 });
                 res.on('error', (err) => {
-                    this.logger.severe('error getting trusted devices:' + err.message);
+                    this.logger.severe(LOGGINGPREFIX + 'error getting trusted devices:' + err.message);
                     resolve([]);
                 });
             });
@@ -370,7 +372,7 @@ class TrustedProxyWorker {
                     resolve(JSON.parse(body));
                 });
                 res.on('error', (err) => {
-                    this.logger.severe('error: ' + err);
+                    this.logger.severe(LOGGINGPREFIX + 'error: ' + err);
                     resolve(null);
                 });
             });
