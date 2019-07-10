@@ -2,7 +2,9 @@
 /* jshint node: true */
 "use strict";
 
+const fs = require('fs');
 const http = require('http');
+const deviceInfoUrl = 'http://localhost:8100/mgmt/shared/identified-devices/config/device-info';
 const localauth = 'Basic ' + new Buffer('admin:').toString('base64');
 
 const LOGGINGPREFIX = '[TrustedProxy] ';
@@ -22,31 +24,37 @@ class TrustedProxyWorker {
     }
 
     onStart(success, error) {
-        const getDeviceOptions = {
-            host: 'localhost',
-            port: 8100,
-            path: '/mgmt/shared/identified-devices/config/device-info',
-            headers: {
-                'Authorization': localauth
-            },
-            method: 'GET'
-        };
-        const deviceRequest = http.request(getDeviceOptions, (res) => {
-            let body = '';
-            res.on('data', (seg) => {
-                body += seg;
+        if (fs.existsSync('/machineId')) {
+            this.machineId = String(fs.readFileSync('/machineId', 'utf8')).replace(/[^ -~]+/g, "");
+            this.logger.info('Found proxy machineId in /machineId file');
+            this.logger.info('Setting proxy machineId to: ' + this.machineId);
+        } else {
+            const getDeviceOptions = {
+                host: 'localhost',
+                port: 8100,
+                path: '/mgmt/shared/identified-devices/config/device-info',
+                headers: {
+                    'Authorization': localauth
+                },
+                method: 'GET'
+            };
+            const deviceRequest = http.request(getDeviceOptions, (res) => {
+                let body = '';
+                res.on('data', (seg) => {
+                    body += seg;
+                });
+                res.on('end', () => {
+                    this.machineId = JSON.parse(body).machineId;
+                    this.logger.info(LOGGINGPREFIX + ' machineID is: ' + this.machineId);
+                    success();
+                });
+                res.on('error', (err) => {
+                    this.logger.severe(LOGGINGPREFIX + 'error: ' + err);
+                    error();
+                });
             });
-            res.on('end', () => {
-                this.machineId = JSON.parse(body).machineId;
-                this.logger.info(LOGGINGPREFIX + ' machineID is: ' + this.machineId);
-                success();
-            });
-            res.on('error', (err) => {
-                this.logger.severe(LOGGINGPREFIX + 'error: ' + err);
-                error();
-            });
-        });
-        deviceRequest.end();
+            deviceRequest.end();
+        }
     }
 
     /**
@@ -259,6 +267,48 @@ class TrustedProxyWorker {
             }
         });
     }
+
+    /**
+     * return back the proxy machine ID
+     * @returns string machine UUID
+     */
+    getProxyMachineId() {
+        return new Promise((resolve, reject) => {
+            if ( this.machineId ) {
+                resolve();
+            } else if(fs.existsSync('/machineId')) {
+                // this is an ASG container
+                this.machineId = String(fs.readFileSync('/machineId', 'utf8')).replace(/[^ -~]+/g, "");
+                this.logger.info('Found proxy machineId in /machineId file');
+                this.logger.info('Setting proxy machineId to: ' + this.machineId);
+                resolve();
+            } else {
+                const certGetRequest = this.restOperationFactory.createRestOperationInstance()
+                    .setUri(this.url.parse(deviceInfoUrl))
+                    .setBasicAuthorization(localauth)
+                    .setIsSetBasicAuthHeader(true)
+                    .setReferer(this.getUri().href);
+                this.restRequestSender.sendGet(certGetRequest)
+                    .then((response) => {
+                        const deivceInfoBody = response.getBody();
+                        if (deivceInfoBody.hasOwnProperty('machineId')) {
+                            this.logger.info('Setting proxy machineId to: ' + deivceInfoBody.machineId);
+                            this.machineId = deivceInfoBody.machineId;
+                            resolve();
+                        } else {
+                            const err = new Error('can not resolve proxy machineId');
+                            reject(err);
+                        }
+                    })
+                    .catch((err) => {
+                        const throwErr = new Error('Error get machineId on the proxy :' + err.message);
+                        this.logger.severe(LOGGINGPREFIX + throwErr.message);
+                        reject(throwErr);
+                    });
+            }
+        });
+    }
+
 
     /**
      * collect all trusted devices.
