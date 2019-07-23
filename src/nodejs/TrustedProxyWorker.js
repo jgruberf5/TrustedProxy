@@ -28,6 +28,7 @@ class TrustedProxyWorker {
             this.machineId = String(fs.readFileSync('/machineId', 'utf8')).replace(/[^ -~]+/g, "");
             this.logger.info('Found proxy machineId in /machineId file');
             this.logger.info('Setting proxy machineId to: ' + this.machineId);
+            success();
         } else {
             const getDeviceOptions = {
                 host: 'localhost',
