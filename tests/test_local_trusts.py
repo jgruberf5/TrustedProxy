@@ -13,12 +13,21 @@ def handler(signum, frame):
 
 
 def print_local_id():
-    local_device_info = requests.get(
+    device_response = requests.get(
         'http://127.0.0.1:8100/mgmt/shared/identified-devices/config/device-info',
-        auth=requests.auth.HTTPBasicAuth('admin', '')).json()
-    local_certs = requests.get(
+        auth=requests.auth.HTTPBasicAuth('admin', ''))
+    device_response.raise_for_status()
+    local_device_info = device_response.json()
+    cert_response = requests.get(
         'http://127.0.0.1:8100/mgmt/shared/device-certificates',
-        auth=requests.auth.HTTPBasicAuth('admin', '')).json()['items']
+        auth=requests.auth.HTTPBasicAuth('admin', ''))
+    cert_response.raise_for_status()
+    cert_json = cert_response.json()
+    local_certs = []
+    if 'items' in cert_json:
+        local_certs = cert_json['items']
+    if not local_certs:
+        raise Exception('no local certificates found.. local iControl REST error')
     local_cert_id = ''
     for c in local_certs:
         if c['machineId'] == local_device_info['machineId']:
@@ -35,8 +44,10 @@ def print_local_id():
 
 
 def print_local_proxy_trusts():
-    proxy_trusts = requests.get(
-        'http://127.0.0.1:8105/shared/TrustedProxy').json()
+    proxy_response = requests.get(
+        'http://127.0.0.1:8105/shared/TrustedProxy')
+    proxy_response.raise_for_status()
+    proxy_trusts = proxy_response.json()
     print "######## LOCAL PROXY TRUSTS ########"
     for d in proxy_trusts:
         sec_left = int(600 - (int(time.time()) - d['timestamp'] / 1000))
