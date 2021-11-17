@@ -43,12 +43,10 @@ def print_local_id():
         if c['machineId'] == local_device_info['machineId']:
             local_cert_id = c['certificateId']
     LOG.info("########### LOCAL DEVICE ###########")
-    LOG.info("%s version %s\n%s\nid: %s\ncertificate id:%s" % (
-        local_device_info['platformMarketingName'],
-        local_device_info['restFrameworkVersion'],
-        local_device_info['hostname'],
-        local_device_info['machineId'],
-        local_cert_id))
+    LOG.info("%s version %s", local_device_info['platformMarketingName'], local_device_info['restFrameworkVersion'])
+    LOG.info("hostname: %s", local_device_info['hostname'])
+    LOG.info("id: %s", local_device_info['machineId'])
+    LOG.info("certificate id:%s" , local_cert_id)
     LOG.info("####################################")
     return local_cert_id
 
