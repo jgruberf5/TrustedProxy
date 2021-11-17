@@ -27,11 +27,12 @@ def print_local_id():
     try:
         device_response = requests.get(
             'http://127.0.0.1:8100/mgmt/shared/identified-devices/config/device-info',
-        auth=requests.auth.HTTPBasicAuth('admin', ''))
+            auth=requests.auth.HTTPBasicAuth('admin', ''))
         device_response.raise_for_status()
         local_device_info = device_response.json()
     except Exception as ex:
-        LOG.error('local iControl REST error getting local device info.. is restjavad down?')
+        LOG.error(
+            'local iControl REST error getting local device info.. is restjavad down?')
         raise ex
     cert_json = {}
     try:
@@ -41,7 +42,8 @@ def print_local_id():
         cert_response.raise_for_status()
         cert_json = cert_response.json()
     except Exception as ex:
-        LOG.error('local iControl REST error getting local certificates.. is restjavad down?')
+        LOG.error(
+            'local iControl REST error getting local certificates.. is restjavad down?')
         raise ex
     local_certs = []
     if 'items' in cert_json:
@@ -69,7 +71,8 @@ def print_local_proxy_trusts():
             'http://127.0.0.1:8105/shared/TrustedProxy')
         proxy_response.raise_for_status()
     except Exception as ex:
-        LOG.error('local iControl LX exception calling TrustedProxy is it installed or is restnoded down?')
+        LOG.error(
+            'local iControl LX exception calling TrustedProxy is it installed or is restnoded down?')
         raise ex
     proxy_trusts = proxy_response.json()
     LOG.info("######## LOCAL PROXY TRUSTS ########")
@@ -107,39 +110,40 @@ def get_remote_device_certificates(targetHost, targetPort):
         return []
 
 
-def do_you_trust_me():
+def do_you_trust_me(localonly):
     my_cert_id = print_local_id()
     devices = print_local_proxy_trusts()
-    LOG.info("########## TESTING TRUSTS ##########")
-    for d in devices:
-        remote_device_info = get_remote_device_info(
-            d['targetHost'], d['targetPort'])
-        remote_certs = get_remote_device_certificates(
-            d['targetHost'], d['targetPort'])
-        trusted = False
-        remote_certificate_id = ''
-        for c in remote_certs:
-            if c['certificateId'] == my_cert_id:
-                trusted = True
-            if c['machineId'] == remote_device_info['machineId']:
-                remote_certificate_id = c['certificateId']
-        remote_print = "%s at %s:%d (%s [%s] machineId: %s certificateId: %s)" % (
-            remote_device_info['hostname'],
-            d['targetHost'],
-            d['targetPort'],
-            remote_device_info['platformMarketingName'],
-            remote_device_info['restFrameworkVersion'],
-            remote_device_info['machineId'],
-            remote_certificate_id
-        )
-        if trusted:
-            LOG.info("%s trusts me" % remote_print)
-    LOG.info("####################################")
+    if not localonly:
+        LOG.info("########## TESTING TRUSTS ##########")
+        for d in devices:
+            remote_device_info = get_remote_device_info(
+                d['targetHost'], d['targetPort'])
+            remote_certs = get_remote_device_certificates(
+                d['targetHost'], d['targetPort'])
+            trusted = False
+            remote_certificate_id = ''
+            for c in remote_certs:
+                if c['certificateId'] == my_cert_id:
+                    trusted = True
+                if c['machineId'] == remote_device_info['machineId']:
+                    remote_certificate_id = c['certificateId']
+            remote_print = "%s at %s:%d (%s [%s] machineId: %s certificateId: %s)" % (
+                remote_device_info['hostname'],
+                d['targetHost'],
+                d['targetPort'],
+                remote_device_info['platformMarketingName'],
+                remote_device_info['restFrameworkVersion'],
+                remote_device_info['machineId'],
+                remote_certificate_id
+            )
+            if trusted:
+                LOG.info("%s trusts me" % remote_print)
+        LOG.info("####################################")
 
 
-def test_cycle(delay):
+def test_cycle(delay, localonly=False):
     try:
-        do_you_trust_me()
+        do_you_trust_me(localonly)
     except Exception as ex:
         LOG.error("test cycle failed with %s" % ex)
     time.sleep(delay)
@@ -153,26 +157,31 @@ def main():
     )
     ap.add_argument(
         '--cycles',
-        help="The number of cycles through local trusts to test",
+        help="The number of cycles through local trusts to test. Default is continuous.",
         required=False,
         type=int,
         default=0
     )
     ap.add_argument(
         '--delay',
-        help="The delay in seconds between cycles",
+        help="The delay in seconds between cycles. Default is 10 seconds.",
         required=False,
         type=int,
         default=10
+    )
+    ap.add_argument(
+        '--localonly',
+        help="Show only local device responses, do not test the remote device trusts. Default is false.",
+        action='store_true'
     )
     args = ap.parse_args()
     signal.signal(signal.SIGINT, handler)
     if args.cycles == 0:
         while True:
-            test_cycle(args.delay)
+            test_cycle(args.delay, localonly=args.localonly)
     else:
         for _ in range(args.cycles):
-            test_cycle(args.delay)
+            test_cycle(args.delay, localonly=args.localonly)
 
 
 if __name__ == '__main__':
