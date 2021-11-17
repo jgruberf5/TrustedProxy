@@ -50,7 +50,9 @@ def get_remote_device_info(targetHost, targetPort):
         'method': 'Get',
         'uri': 'https://%s:%d/mgmt/shared/identified-devices/config/device-info' % (targetHost, targetPort)
     }
-    return requests.post('http://127.0.0.1:8105/shared/TrustedProxy', json=data).json()
+    response = requests.post('http://127.0.0.1:8105/shared/TrustedProxy', json=data)
+    response.raise_for_status()
+    return response.json()
 
 
 def get_remote_device_certificates(targetHost, targetPort):
@@ -58,7 +60,13 @@ def get_remote_device_certificates(targetHost, targetPort):
         'method': 'Get',
         'uri': 'https://%s:%d/mgmt/shared/device-certificates' % (targetHost, targetPort)
     }
-    return requests.post('http://127.0.0.1:8105/shared/TrustedProxy', json=data).json()['items']
+    response = requests.post('http://127.0.0.1:8105/shared/TrustedProxy', json=data)
+    response.raise_for_status()
+    response_json = response.json()
+    if 'items' in response_json:
+        return response_json['items']
+    else:
+        return []
 
 
 def do_you_trust_me():
@@ -109,12 +117,14 @@ def main():
         '--cycles',
         help="The number of cycles through local trusts to test",
         required=False,
+        type=int,
         default=0
     )
     ap.add_argument(
         '--delay',
         help="The delay in seconds between cycles",
         required=False,
+        type=int,
         default=10
     )
     args = ap.parse_args()
