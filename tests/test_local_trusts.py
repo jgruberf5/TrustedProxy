@@ -5,10 +5,20 @@ import time
 import sys
 import signal
 import argparse
+import logging
+
+
+LOG = logging.getLogger('trusted_proxy_testing')
+LOG.setLevel(logging.DEBUG)
+FORMATTER = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+LOGSTREAM = logging.StreamHandler(sys.stdout)
+LOGSTREAM.setFormatter(FORMATTER)
+LOG.addHandler(LOGSTREAM)
 
 
 def handler(signum, frame):
-    print "\n\nExiting...\n\n"
+    LOG.info('user requested exit..')
     sys.exit(0)
 
 
@@ -32,14 +42,14 @@ def print_local_id():
     for c in local_certs:
         if c['machineId'] == local_device_info['machineId']:
             local_cert_id = c['certificateId']
-    print "########### LOCAL DEVICE ###########"
-    print "%s version %s\n%s\nid: %s\ncertificate id:%s" % (
+    LOG.info("########### LOCAL DEVICE ###########")
+    LOG.info("%s version %s\n%s\nid: %s\ncertificate id:%s" % (
         local_device_info['platformMarketingName'],
         local_device_info['restFrameworkVersion'],
         local_device_info['hostname'],
         local_device_info['machineId'],
-        local_cert_id)
-    print "####################################"
+        local_cert_id))
+    LOG.info("####################################")
     return local_cert_id
 
 
@@ -48,11 +58,11 @@ def print_local_proxy_trusts():
         'http://127.0.0.1:8105/shared/TrustedProxy')
     proxy_response.raise_for_status()
     proxy_trusts = proxy_response.json()
-    print "######## LOCAL PROXY TRUSTS ########"
+    LOG.info("######## LOCAL PROXY TRUSTS ########")
     for d in proxy_trusts:
         sec_left = int(600 - (int(time.time()) - d['timestamp'] / 1000))
-        print 'have a trust token for: %s:%d for another %d seconds' % (d['targetHost'], d['targetPort'], sec_left)
-    print "####################################"
+        LOG.info('have a trust token for: %s:%d for another %d seconds' % (d['targetHost'], d['targetPort'], sec_left))
+    LOG.info("####################################")
     return proxy_trusts
 
 
@@ -83,7 +93,7 @@ def get_remote_device_certificates(targetHost, targetPort):
 def do_you_trust_me():
     my_cert_id = print_local_id()
     devices = print_local_proxy_trusts()
-    print "########## TESTING TRUSTS ##########"
+    LOG.info("########## TESTING TRUSTS ##########")
     for d in devices:
         remote_device_info = get_remote_device_info(
             d['targetHost'], d['targetPort'])
@@ -106,15 +116,15 @@ def do_you_trust_me():
             remote_certificate_id
         )
         if trusted:
-            print "%s trusts me" % remote_print
-    print "####################################"
+            LOG.info("%s trusts me" % remote_print)
+    LOG.info("####################################")
 
 
 def test_cycle(delay):
     try:
         do_you_trust_me()
     except Exception as ex:
-        print "test cycle failed with %s" % ex
+        LOG.error("test cycle failed with %s" % ex)
     time.sleep(delay)
 
 
