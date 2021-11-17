@@ -23,24 +23,26 @@ def handler(signum, frame):
 
 
 def print_local_id():
-    device_response = requests.get(
-        'http://127.0.0.1:8100/mgmt/shared/identified-devices/config/device-info',
-        auth=requests.auth.HTTPBasicAuth('admin', ''))
+    local_device_info = {}
     try:
+        device_response = requests.get(
+            'http://127.0.0.1:8100/mgmt/shared/identified-devices/config/device-info',
+        auth=requests.auth.HTTPBasicAuth('admin', ''))
         device_response.raise_for_status()
+        local_device_info = device_response.json()
     except Exception as ex:
         LOG.error('local iControl REST error getting local device info.. is restjavad down?')
         raise ex
-    local_device_info = device_response.json()
-    cert_response = requests.get(
-        'http://127.0.0.1:8100/mgmt/shared/device-certificates',
-        auth=requests.auth.HTTPBasicAuth('admin', ''))
+    cert_json = {}
     try:
+        cert_response = requests.get(
+            'http://127.0.0.1:8100/mgmt/shared/device-certificates',
+            auth=requests.auth.HTTPBasicAuth('admin', ''))
         cert_response.raise_for_status()
+        cert_json = cert_response.json()
     except Exception as ex:
         LOG.error('local iControl REST error getting local certificates.. is restjavad down?')
         raise ex
-    cert_json = cert_response.json()
     local_certs = []
     if 'items' in cert_json:
         local_certs = cert_json['items']
@@ -62,9 +64,9 @@ def print_local_id():
 
 
 def print_local_proxy_trusts():
-    proxy_response = requests.get(
-        'http://127.0.0.1:8105/shared/TrustedProxy')
     try:
+        proxy_response = requests.get(
+            'http://127.0.0.1:8105/shared/TrustedProxy')
         proxy_response.raise_for_status()
     except Exception as ex:
         LOG.error('local iControl LX exception calling TrustedProxy is it installed or is restnoded down?')
