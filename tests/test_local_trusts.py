@@ -37,16 +37,18 @@ def print_local_id():
     if 'items' in cert_json:
         local_certs = cert_json['items']
     if not local_certs:
-        raise Exception('no local certificates found.. local iControl REST error')
+        raise Exception(
+            'no local certificates found.. local iControl REST error')
     local_cert_id = ''
     for c in local_certs:
         if c['machineId'] == local_device_info['machineId']:
             local_cert_id = c['certificateId']
     LOG.info("########### LOCAL DEVICE ###########")
-    LOG.info("%s version %s", local_device_info['platformMarketingName'], local_device_info['restFrameworkVersion'])
+    LOG.info("%s version %s",
+             local_device_info['platformMarketingName'], local_device_info['restFrameworkVersion'])
     LOG.info("hostname: %s", local_device_info['hostname'])
     LOG.info("id: %s", local_device_info['machineId'])
-    LOG.info("certificate id:%s" , local_cert_id)
+    LOG.info("certificate id:%s", local_cert_id)
     LOG.info("####################################")
     return local_cert_id
 
@@ -59,7 +61,8 @@ def print_local_proxy_trusts():
     LOG.info("######## LOCAL PROXY TRUSTS ########")
     for d in proxy_trusts:
         sec_left = int(600 - (int(time.time()) - d['timestamp'] / 1000))
-        LOG.info('have a trust token for: %s:%d for another %d seconds' % (d['targetHost'], d['targetPort'], sec_left))
+        LOG.info('have a trust token for: %s:%d for another %d seconds' %
+                 (d['targetHost'], d['targetPort'], sec_left))
     LOG.info("####################################")
     return proxy_trusts
 
@@ -69,7 +72,8 @@ def get_remote_device_info(targetHost, targetPort):
         'method': 'Get',
         'uri': 'https://%s:%d/mgmt/shared/identified-devices/config/device-info' % (targetHost, targetPort)
     }
-    response = requests.post('http://127.0.0.1:8105/shared/TrustedProxy', json=data)
+    response = requests.post(
+        'http://127.0.0.1:8105/shared/TrustedProxy', json=data)
     response.raise_for_status()
     return response.json()
 
@@ -79,7 +83,8 @@ def get_remote_device_certificates(targetHost, targetPort):
         'method': 'Get',
         'uri': 'https://%s:%d/mgmt/shared/device-certificates' % (targetHost, targetPort)
     }
-    response = requests.post('http://127.0.0.1:8105/shared/TrustedProxy', json=data)
+    response = requests.post(
+        'http://127.0.0.1:8105/shared/TrustedProxy', json=data)
     response.raise_for_status()
     response_json = response.json()
     if 'items' in response_json:
