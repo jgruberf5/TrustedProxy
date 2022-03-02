@@ -26,7 +26,7 @@ class TrustedProxyWorker {
     onStart(success, error) {
         if (fs.existsSync('/machineId')) {
             this.machineId = String(
-                fs.readFileSync('/machineId', 'utf8'),
+                fs.readFileSync('/machineId', 'utf8')
             ).replace(/[^ -~]+/g, '');
             this.logger.info('Found proxy machineId in /machineId file');
             this.logger.info('Setting proxy machineId to: ' + this.machineId);
@@ -49,7 +49,7 @@ class TrustedProxyWorker {
                 res.on('end', () => {
                     this.machineId = JSON.parse(body).machineId;
                     this.logger.info(
-                        LOGGINGPREFIX + ' machineID is: ' + this.machineId,
+                        LOGGINGPREFIX + ' machineID is: ' + this.machineId
                     );
                     success();
                 });
@@ -97,12 +97,12 @@ class TrustedProxyWorker {
                         this.completeRestOperation(restOperation);
                     } else {
                         const err = new Error(
-                            'target ' + targetDevice + ' has no token',
+                            'target ' + targetDevice + ' has no token'
                         );
                         err.httpStatusCode = 500;
                         restOperation.fail(err);
                     }
-                },
+                }
             );
         } else {
             this.getTrustedDevices().then((trustedDevices) => {
@@ -116,7 +116,7 @@ class TrustedProxyWorker {
                         ) {
                             targetHostFound = true;
                             const tokenPromise = this.getToken(
-                                trustedDevice.address,
+                                trustedDevice.address
                             ).then((token) => {
                                 if (token) {
                                     token.targetUUID = trustedDevice.machineId;
@@ -130,7 +130,7 @@ class TrustedProxyWorker {
                                     const err = new Error(
                                         'target ' +
                                             targetDevice +
-                                            ' has no token',
+                                            ' has no token'
                                     );
                                     this.trustedDevices = {};
                                     err.httpStatusCode = 500;
@@ -145,7 +145,7 @@ class TrustedProxyWorker {
                             const err = new Error(
                                 'target ' +
                                     targetDevice +
-                                    ' is not a trusted device',
+                                    ' is not a trusted device'
                             );
                             this.trustedDevices = {};
                             err.httpStatusCode = 404;
@@ -157,7 +157,7 @@ class TrustedProxyWorker {
                     const tokenPromises = [];
                     trustedDevices.map((trustedDevice) => {
                         const tokenPromise = this.getToken(
-                            trustedDevice.address,
+                            trustedDevice.address
                         ).then((token) => {
                             if (token) {
                                 token.targetUUID = trustedDevice.machineId;
@@ -172,7 +172,7 @@ class TrustedProxyWorker {
                     Promise.all(tokenPromises).then(() => {
                         restOperation.statusCode = 200;
                         restOperation.body = JSON.stringify(
-                            Object.keys(tokens).map((e) => tokens[e]),
+                            Object.keys(tokens).map((e) => tokens[e])
                         );
                         this.completeRestOperation(restOperation);
                     });
@@ -231,17 +231,17 @@ class TrustedProxyWorker {
                             refThis.logger.severe(
                                 LOGGINGPREFIX + 'request to %s failed: \n%s',
                                 body.uri,
-                                err ? err.message : '',
+                                err ? err.message : ''
                             );
                             restOperation.fail(err);
-                        },
+                        }
                     );
                 } else {
                     const err = new Error(
                         LOGGINGPREFIX +
                             'target ' +
                             targetUUID +
-                            ' is not a trusted device',
+                            ' is not a trusted device'
                     );
                     err.httpStatusCode = 404;
                     restOperation.fail(err);
@@ -284,10 +284,10 @@ class TrustedProxyWorker {
                     refThis.logger.severe(
                         LOGGINGPREFIX + 'request to %s failed: \n%s',
                         body.uri,
-                        err ? err.message : '',
+                        err ? err.message : ''
                     );
                     restOperation.fail(err);
-                },
+                }
             );
         }
     }
@@ -302,7 +302,7 @@ class TrustedProxyWorker {
                 resolve(
                     this.trustedDevices[targetUUID].address +
                         ':' +
-                        this.trustedDevices[targetUUID].httpsPort,
+                        this.trustedDevices[targetUUID].httpsPort
                 );
             } else {
                 this.getTrustedDevices().then(() => {
@@ -310,7 +310,7 @@ class TrustedProxyWorker {
                         resolve(
                             this.trustedDevices[targetUUID].address +
                                 ':' +
-                                this.trustedDevices[targetUUID].httpsPort,
+                                this.trustedDevices[targetUUID].httpsPort
                         );
                     } else {
                         resolve(null);
@@ -331,11 +331,11 @@ class TrustedProxyWorker {
             } else if (fs.existsSync('/machineId')) {
                 // this is an ASG container
                 this.machineId = String(
-                    fs.readFileSync('/machineId', 'utf8'),
+                    fs.readFileSync('/machineId', 'utf8')
                 ).replace(/[^ -~]+/g, '');
                 this.logger.info('Found proxy machineId in /machineId file');
                 this.logger.info(
-                    'Setting proxy machineId to: ' + this.machineId,
+                    'Setting proxy machineId to: ' + this.machineId
                 );
                 resolve();
             } else {
@@ -353,20 +353,20 @@ class TrustedProxyWorker {
                         if (deivceInfoBody.hasOwnProperty('machineId')) {
                             this.logger.info(
                                 'Setting proxy machineId to: ' +
-                                    deivceInfoBody.machineId,
+                                    deivceInfoBody.machineId
                             );
                             this.machineId = deivceInfoBody.machineId;
                             resolve();
                         } else {
                             const err = new Error(
-                                'can not resolve proxy machineId',
+                                'can not resolve proxy machineId'
                             );
                             reject(err);
                         }
                     })
                     .catch((err) => {
                         const throwErr = new Error(
-                            'Error get machineId on the proxy :' + err.message,
+                            'Error get machineId on the proxy :' + err.message
                         );
                         this.logger.severe(LOGGINGPREFIX + throwErr.message);
                         reject(throwErr);
@@ -406,7 +406,7 @@ class TrustedProxyWorker {
                             deviceGroups.map((deviceGroup) => {
                                 if (
                                     deviceGroup.groupName.startsWith(
-                                        'TrustProxy',
+                                        'TrustProxy'
                                     )
                                 ) {
                                     trustedGroups.push(deviceGroup.groupName);
@@ -438,7 +438,7 @@ class TrustedProxyWorker {
                                                     if (res.statusCode < 400) {
                                                         const devices =
                                                             JSON.parse(
-                                                                body,
+                                                                body
                                                             ).items;
                                                         devices.map(
                                                             (device) => {
@@ -452,18 +452,18 @@ class TrustedProxyWorker {
                                                                         device.machineId
                                                                     ] = device;
                                                                     trustedDevices.push(
-                                                                        device,
+                                                                        device
                                                                     );
                                                                 }
-                                                            },
+                                                            }
                                                         );
                                                     }
                                                     resolve();
                                                 });
-                                            },
+                                            }
                                         );
                                         deviceRequest.end();
-                                    },
+                                    }
                                 );
                                 trustedDevicePromises.push(devicePromise);
                             });
@@ -472,7 +472,7 @@ class TrustedProxyWorker {
                             });
                         } else {
                             this.logger.severe(
-                                LOGGINGPREFIX + 'no device groups found',
+                                LOGGINGPREFIX + 'no device groups found'
                             );
                             resolve([]);
                         }
@@ -481,11 +481,11 @@ class TrustedProxyWorker {
                         this.logger.severe(
                             LOGGINGPREFIX +
                                 'error getting trusted devices:' +
-                                err.message,
+                                err.message
                         );
                         resolve([]);
                     });
-                },
+                }
             );
             deviceGroupRequest.end();
         });
