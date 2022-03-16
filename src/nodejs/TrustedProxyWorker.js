@@ -196,6 +196,10 @@ class TrustedProxyWorker {
                 if (targetHost) {
                     const targetURI = 'https://' + targetHost + body.uri;
                     // Create the framework request RestOperation to proxy to a trusted device.
+                    // Discern the HTTP headers for the request to proxy from the 'headers' attribute in the request body.
+                    let headers = body.headers || restOperation.getHeaders();
+                    // Fix the new v15 behavior
+                    headers.Connection = 'close';
                     let identifiedDeviceRequest = this.restOperationFactory
                         .createRestOperationInstance()
                         // Tell the ASG to resolve trusted device for this request.
@@ -205,14 +209,12 @@ class TrustedProxyWorker {
                         .setMethod(body.method || 'Get')
                         // Discern the URI for the request to proxy from the 'uri' attribute in the request body.
                         .setUri(this.url.parse(targetURI))
-                        // Discern the HTTP headers for the request to proxy from the 'headers' attribute in the request body.
-                        .setHeaders(body.headers || restOperation.getHeaders())
+                        // Force request headers
+                        .setHeaders(headers)
                         // Discern the HTTP body for the request to proxy from the 'body' attribute in the request body.
                         .setBody(body.body)
                         // Derive the referer from the parsed URI.
-                        .setReferer(this.getUri().href)
-                        // Fix the new v15 behavior
-                        .setHeader('Connection', 'close');
+                        .setReferer(this.getUri().href);
                     this.eventChannel.emit(
                         this.eventChannel.e.sendRestOperation,
                         identifiedDeviceRequest,
@@ -249,6 +251,10 @@ class TrustedProxyWorker {
             });
         } else {
             // Create the framework request RestOperation to proxy to a trusted device.
+            // Discern the HTTP headers for the request to proxy from the 'headers' attribute in the request body.
+            let headers = body.headers || restOperation.getHeaders();
+            // Fix the new v15 behavior
+            headers.Connection = 'close';
             let identifiedDeviceRequest = this.restOperationFactory
                 .createRestOperationInstance()
                 // Tell the ASG to resolve trusted device for this request.
@@ -258,14 +264,12 @@ class TrustedProxyWorker {
                 .setMethod(body.method || 'Get')
                 // Discern the URI for the request to proxy from the 'uri' attribute in the request body.
                 .setUri(this.url.parse(body.uri))
-                // Discern the HTTP headers for the request to proxy from the 'headers' attribute in the request body.
-                .setHeaders(body.headers || restOperation.getHeaders())
+                // Force Headers
+                .setHeaders(headers)
                 // Discern the HTTP body for the request to proxy from the 'body' attribute in the request body.
                 .setBody(body.body)
                 // Derive the referer from the parsed URI.
-                .setReferer(this.getUri().href)
-                // Fix the new v15 behavior
-                .setHeader('Connection', 'close');
+                .setReferer(this.getUri().href);
             this.eventChannel.emit(
                 this.eventChannel.e.sendRestOperation,
                 identifiedDeviceRequest,
@@ -345,7 +349,7 @@ class TrustedProxyWorker {
                     .setBasicAuthorization(localauth)
                     .setIsSetBasicAuthHeader(true)
                     .setReferer(this.getUri().href)
-                    .setHeader('Connection', 'close');
+                    .setHeaders({'Connection': 'close'});
                 this.restRequestSender
                     .sendGet(certGetRequest)
                     .then((response) => {
